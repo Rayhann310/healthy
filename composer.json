@@ -1,0 +1,12 @@
+{
+    "name": "kathahealthy/app",
+    "description": "KathaHealthy Smart Blood Pressure Monitor",
+    "require": {
+        "dompdf/dompdf": "3.0"
+    },
+    "authors": [
+        {
+            "name": "Developer"
+        }
+    ]
+}
