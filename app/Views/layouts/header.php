@@ -235,6 +235,8 @@
             padding: 2rem;
             width: 90%;
             max-width: 450px;
+            max-height: 90vh;
+            overflow-y: auto;
             transform: translateY(20px);
             transition: transform 0.3s ease;
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
