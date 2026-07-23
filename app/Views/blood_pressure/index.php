@@ -88,6 +88,14 @@
                 <?php endif; ?>
             </div>
             
+            <div style="background: rgba(0, 118, 182, 0.05); padding: 1rem; border-radius: 12px; margin-bottom: 1rem; border: 1px dashed var(--primary); text-align: center;">
+                <p style="font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--text-gray);">Gunakan alat Tensi Digital ber-Bluetooth (seperti ABN) agar otomatis terisi.</p>
+                <button type="button" class="btn btn-primary" onclick="connectBluetooth()" style="background: var(--dark); border: none; padding: 0.5rem 1rem; font-size: 0.9rem;">
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 5px; vertical-align: middle;"><polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline></svg>
+                    Hubungkan via Bluetooth
+                </button>
+            </div>
+
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div class="form-group" style="margin-bottom: 0;">
                     <label class="form-label">Tanggal Pengukuran</label>
@@ -169,6 +177,66 @@
         }
     });
 <?php endif; ?>
+
+// --- BLUETOOTH INTEGRATION ---
+async function connectBluetooth() {
+    try {
+        if (!navigator.bluetooth) {
+            alert('Browser Anda tidak mendukung Web Bluetooth. Gunakan Google Chrome versi terbaru di PC/Android.');
+            return;
+        }
+
+        const device = await navigator.bluetooth.requestDevice({
+            filters: [{ services: ['blood_pressure'] }]
+        });
+        
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService('blood_pressure');
+        const characteristic = await service.getCharacteristic('blood_pressure_measurement');
+        
+        await characteristic.startNotifications();
+        characteristic.addEventListener('characteristicvaluechanged', handleBloodPressureMeasurement);
+        
+        alert('Terhubung ke ' + device.name + '! Silakan mulai pengukuran pada alat Anda.');
+    } catch(error) {
+        console.error(error);
+        alert('Gagal menghubungkan Bluetooth: ' + error.message);
+    }
+}
+
+function handleBloodPressureMeasurement(event) {
+    const value = event.target.value;
+    const flags = value.getUint8(0);
+    
+    // IEEE 11073 16-bit SFLOAT parser
+    const parseSFloat = (val, offset) => {
+        const raw = val.getUint16(offset, true);
+        const mantissa = raw & 0x0FFF;
+        const exponent = raw >> 12;
+        let e = exponent >= 8 ? exponent - 16 : exponent;
+        let m = mantissa >= 2048 ? mantissa - 4096 : mantissa;
+        return Math.round(m * Math.pow(10, e));
+    };
+
+    const sys = parseSFloat(value, 1);
+    const dia = parseSFloat(value, 3);
+    
+    let pulseIndex = 7;
+    if (flags & 0x02) pulseIndex += 7; // if timestamp is present
+    
+    let pulse = '';
+    if (flags & 0x04) {
+        pulse = parseSFloat(value, pulseIndex);
+    }
+
+    // Auto-fill form
+    document.querySelector('input[name="systolic"]').value = sys;
+    document.querySelector('input[name="diastolic"]').value = dia;
+    if (pulse) document.querySelector('input[name="heart_rate"]').value = pulse;
+    
+    alert('Bip! Data otomatis masuk dari alat tensi.');
+}
+// -----------------------------
 
 document.getElementById('bpForm').addEventListener('submit', function(e) {
     e.preventDefault();
